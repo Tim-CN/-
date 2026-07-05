@@ -212,6 +212,39 @@
             background: rgba(255, 255, 255, 0.15);
         }
 
+        /* ===== 跳跃按钮 ===== */
+        #jump-btn {
+            position: fixed;
+            right: 30px;
+            bottom: 30px;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+            z-index: 20;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            touch-action: none;
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: background 0.1s;
+            user-select: none;
+        }
+        #jump-btn:active {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(0.92);
+        }
+        #jump-btn span {
+            pointer-events: none;
+        }
+
         @media (max-width: 640px) {
             #joystick-zone {
                 width: 100px;
@@ -222,6 +255,13 @@
             #joystick-knob {
                 width: 44px;
                 height: 44px;
+            }
+            #jump-btn {
+                width: 100px;
+                height: 100px;
+                right: 20px;
+                bottom: 20px;
+                font-size: 20px;
             }
             #hud {
                 padding: 0 16px;
@@ -258,6 +298,13 @@
                 width: 36px;
                 height: 36px;
             }
+            #jump-btn {
+                width: 80px;
+                height: 80px;
+                right: 12px;
+                bottom: 12px;
+                font-size: 18px;
+            }
             #controls-hint {
                 font-size: 10px;
                 padding: 4px 12px;
@@ -292,6 +339,9 @@
         <div id="joystick-knob"></div>
     </div>
 
+    <!-- 跳跃按钮 -->
+    <div id="jump-btn"><span>⬆</span></div>
+
     <div id="controls-hint">
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 · <kbd>空格</kbd> 跳跃 · 拖拽旋转视角
     </div>
@@ -310,7 +360,6 @@
 
     <!-- Three.js -->
     <script>
-        // 加载 Three.js
         function loadThree(callback) {
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
@@ -328,7 +377,6 @@
         }
 
         loadThree(function() {
-            // 如果 THREE 未定义则报错
             if (typeof THREE === 'undefined') {
                 document.getElementById('loading-error').classList.add('active');
                 return;
@@ -338,7 +386,7 @@
         });
 
         function initGame() {
-            // ---------- DOM 引用 ----------
+            // ---------- DOM ----------
             const scoreSpan = document.getElementById('score-value');
             const collectSpan = document.getElementById('collect-count');
             const totalSpan = document.getElementById('total-count');
@@ -349,8 +397,9 @@
             const restartBtn = document.getElementById('restart-btn');
             const joystickZone = document.getElementById('joystick-zone');
             const joystickKnob = document.getElementById('joystick-knob');
+            const jumpBtn = document.getElementById('jump-btn');
 
-            // ---------- 游戏配置 ----------
+            // ---------- 配置 ----------
             const CONFIG = {
                 worldSize: 18,
                 playerSize: 0.9,
@@ -365,7 +414,7 @@
                 cameraLerp: 0.06,
             };
 
-            // ---------- Three.js 基础 ----------
+            // ---------- 场景 ----------
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0b0e1a);
             scene.fog = new THREE.Fog(0x0b0e1a, 25, 45);
@@ -721,21 +770,21 @@
             let totalCollectibles = CONFIG.collectCount;
 
             // ---------- 视角控制 ----------
-            let cameraAngle = Math.PI / 4; // 初始角度 (对应 (0,0,14) 方向)
+            let cameraAngle = Math.PI / 4;
             let cameraTargetAngle = cameraAngle;
             let isDragging = false;
-            let prevMouseX = 0;
-            let prevMouseY = 0;
+            let prevMouseX = 0,
+                prevMouseY = 0;
 
             // ---------- 键盘 ----------
             const keys = { w: false, a: false, s: false, d: false, space: false };
 
-            // ---------- 摇杆状态 ----------
+            // ---------- 摇杆 ----------
             let joystickActive = false;
             let joystickTouchId = null;
-            let joystickDir = { x: 0, y: 0 }; // 归一化方向
+            let joystickDir = { x: 0, y: 0 };
 
-            // ---------- UI 更新 ----------
+            // ---------- UI ----------
             function updateScoreUI() { scoreSpan.textContent = score; }
 
             function updateCollectUI() {
@@ -758,7 +807,6 @@
                 finalScore.textContent = score;
             }
 
-            // ---------- 重置游戏 ----------
             function resetGame() {
                 playerGroup.position.set(0, 0, 0);
                 player.velocity.set(0, 0, 0);
@@ -782,12 +830,11 @@
                 gameState = 'playing';
                 cameraAngle = Math.PI / 4;
                 cameraTargetAngle = cameraAngle;
-                // 重置摇杆
                 joystickDir = { x: 0, y: 0 };
                 joystickKnob.style.transform = 'translate(0px, 0px)';
             }
 
-            // ---------- 碰撞检测 ----------
+            // ---------- 碰撞 ----------
             function checkCollisions() {
                 const pPos = playerGroup.position;
                 const pSize = CONFIG.playerSize * 0.4;
@@ -827,15 +874,13 @@
                     player.velocity.z = 0; }
             }
 
-            // ---------- 移动逻辑（基于视角） ----------
+            // ---------- 移动方向 ----------
             function getMoveDirection() {
-                // 计算摄像机水平朝向
                 const forward = new THREE.Vector3(-Math.sin(cameraAngle), 0, -Math.cos(cameraAngle));
                 const right = new THREE.Vector3(Math.cos(cameraAngle), 0, -Math.sin(cameraAngle));
 
                 let moveX = 0,
                     moveZ = 0;
-                // 键盘
                 if (keys.w) { moveX += forward.x;
                     moveZ += forward.z; }
                 if (keys.s) { moveX -= forward.x;
@@ -845,11 +890,10 @@
                 if (keys.d) { moveX += right.x;
                     moveZ += right.z; }
 
-                // 摇杆
                 if (joystickActive) {
                     const jx = joystickDir.x;
                     const jy = joystickDir.y;
-                    // 摇杆 y 向上为前进，x 向右为右
+                    // 摇杆 y 向上为前进（已取反修正）
                     moveX += forward.x * jy + right.x * jx;
                     moveZ += forward.z * jy + right.z * jx;
                 }
@@ -861,7 +905,7 @@
                 return null;
             }
 
-            // ---------- 键盘事件 ----------
+            // ---------- 键盘 ----------
             document.addEventListener('keydown', (e) => {
                 const key = e.key.toLowerCase();
                 if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
@@ -892,7 +936,7 @@
                 }
             });
 
-            // ---------- 鼠标视角控制 ----------
+            // ---------- 鼠标视角 ----------
             renderer.domElement.addEventListener('mousedown', (e) => {
                 if (e.button === 0) {
                     isDragging = true;
@@ -903,31 +947,33 @@
             window.addEventListener('mousemove', (e) => {
                 if (isDragging) {
                     const dx = e.clientX - prevMouseX;
-                    const dy = e.clientY - prevMouseY;
                     cameraTargetAngle -= dx * 0.008;
                     prevMouseX = e.clientX;
                     prevMouseY = e.clientY;
                 }
             });
-            window.addEventListener('mouseup', () => {
-                isDragging = false;
-            });
+            window.addEventListener('mouseup', () => { isDragging = false; });
 
-            // ---------- 触摸视角控制（非摇杆区域） ----------
+            // ---------- 触摸视角 ----------
             let viewTouchId = null;
             let viewLastX = 0;
 
             renderer.domElement.addEventListener('touchstart', (e) => {
-                // 检查触摸点是否在摇杆区域内
                 const touch = e.touches[0];
                 const rect = joystickZone.getBoundingClientRect();
                 const isInJoystick = (
                     touch.clientX >= rect.left && touch.clientX <= rect.right &&
                     touch.clientY >= rect.top && touch.clientY <= rect.bottom
                 );
-                if (isInJoystick) return; // 交给摇杆处理
+                if (isInJoystick) return;
+                // 检查是否在跳跃按钮上
+                const jumpRect = jumpBtn.getBoundingClientRect();
+                const isInJump = (
+                    touch.clientX >= jumpRect.left && touch.clientX <= jumpRect.right &&
+                    touch.clientY >= jumpRect.top && touch.clientY <= jumpRect.bottom
+                );
+                if (isInJump) return;
 
-                // 否则为视角控制
                 if (viewTouchId === null) {
                     viewTouchId = touch.identifier;
                     viewLastX = touch.clientX;
@@ -952,12 +998,9 @@
                     }
                 }
             }, { passive: true });
+            renderer.domElement.addEventListener('touchcancel', () => { viewTouchId = null; }, { passive: true });
 
-            renderer.domElement.addEventListener('touchcancel', () => {
-                viewTouchId = null;
-            }, { passive: true });
-
-            // ---------- 摇杆触摸事件 ----------
+            // ---------- 摇杆触摸 ----------
             joystickZone.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
@@ -985,7 +1028,6 @@
                     }
                 }
             }, { passive: true });
-
             joystickZone.addEventListener('touchcancel', () => {
                 joystickActive = false;
                 joystickTouchId = null;
@@ -1006,16 +1048,27 @@
                 const finalX = Math.cos(angle) * clampedDist;
                 const finalY = Math.sin(angle) * clampedDist;
                 joystickKnob.style.transform = `translate(${finalX}px, ${finalY}px)`;
-                // 归一化方向（摇杆死区）
                 if (dist > 5) {
                     const norm = Math.min(1, dist / maxR);
+                    // 关键修复：摇杆 y 取反，使得上滑（dy 负）为前进（正）
                     joystickDir.x = (dx / dist) * norm;
-                    joystickDir.y = (dy / dist) * norm; // y 向上为前进
+                    joystickDir.y = -(dy / dist) * norm; // 取反
                 } else {
                     joystickDir.x = 0;
                     joystickDir.y = 0;
                 }
             }
+
+            // ---------- 跳跃按钮 ----------
+            function handleJump(e) {
+                e.preventDefault();
+                if (gameState === 'playing' && player.onGround) {
+                    player.velocity.y = CONFIG.jumpForce;
+                    player.onGround = false;
+                }
+            }
+            jumpBtn.addEventListener('touchstart', handleJump, { passive: false });
+            jumpBtn.addEventListener('mousedown', handleJump);
 
             // ---------- 窗口自适应 ----------
             window.addEventListener('resize', () => {
@@ -1027,7 +1080,7 @@
             // ---------- 初始化 ----------
             resetGame();
 
-            // ---------- 游戏循环 ----------
+            // ---------- 循环 ----------
             let clock = new THREE.Clock();
 
             function animate() {
@@ -1036,13 +1089,11 @@
                 const time = clock.elapsedTime;
 
                 if (gameState === 'playing') {
-                    // 更新视角角度（平滑）
                     let diff = cameraTargetAngle - cameraAngle;
                     while (diff > Math.PI) diff -= Math.PI * 2;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     cameraAngle += diff * 0.08;
 
-                    // 移动
                     const moveDir = getMoveDirection();
                     if (moveDir) {
                         const speed = CONFIG.playerSpeed;
@@ -1055,11 +1106,7 @@
                         player.velocity.z *= 0.9;
                     }
 
-                    // 跳跃 & 重力
-                    if (keys.space && player.onGround) {
-                        player.velocity.y = CONFIG.jumpForce;
-                        player.onGround = false;
-                    }
+                    // 跳跃（空格已处理，按钮触发同样逻辑）
                     player.velocity.y += CONFIG.gravity * delta;
                     playerGroup.position.x += player.velocity.x * delta;
                     playerGroup.position.y += player.velocity.y * delta;
@@ -1071,7 +1118,6 @@
                         player.onGround = true;
                     }
 
-                    // 玩家朝向（仅键盘/摇杆方向）
                     if (moveDir && (Math.abs(moveDir.x) > 0.01 || Math.abs(moveDir.z) > 0.01)) {
                         const targetAngle = Math.atan2(moveDir.x, moveDir.z);
                         let currentAngle = playerGroup.rotation.y;
@@ -1081,7 +1127,6 @@
                         playerGroup.rotation.y += diffAngle * Math.min(1, delta * 10);
                     }
 
-                    // 弹跳动画
                     const isMoving = moveDir && (keys.w || keys.s || keys.a || keys.d || joystickActive);
                     if (isMoving && player.onGround) {
                         const bob = Math.sin(time * 12) * 0.03;
@@ -1094,7 +1139,6 @@
 
                     checkCollisions();
 
-                    // 收集物动画
                     for (const c of collectibles) {
                         const ud = c.userData;
                         c.rotation.x += ud.rotSpeed * delta;
@@ -1104,7 +1148,6 @@
                         c.scale.set(pulse, pulse, pulse);
                     }
 
-                    // 障碍物动画
                     for (const o of obstacles) {
                         const ud = o.userData;
                         const t = Math.sin(time * ud.speed * 0.5 + ud.phase);
@@ -1119,7 +1162,6 @@
                         }
                     }
 
-                    // 粒子更新
                     for (let i = particles.length - 1; i >= 0; i--) {
                         const p = particles[i];
                         p.position.add(p.userData.vel.clone().multiplyScalar(delta));
@@ -1137,7 +1179,6 @@
                     }
                 }
 
-                // 相机跟随（带视角旋转）
                 const targetPos = new THREE.Vector3(
                     playerGroup.position.x + CONFIG.cameraDistance * Math.sin(cameraAngle),
                     CONFIG.cameraHeight + playerGroup.position.y * 0.2,
@@ -1152,10 +1193,7 @@
 
             animate();
 
-            // ---------- 重启按钮 ----------
             restartBtn.addEventListener('click', resetGame);
-
-            // 阻止右键菜单
             renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
             console.log('🎮 3D 收集大冒险已启动！');
