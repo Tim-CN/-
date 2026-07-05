@@ -273,22 +273,43 @@
         </div>
     </div>
 
-    <!-- ====== Three.js (使用稳定 CDN) ====== -->
+    <!-- ====== Three.js (使用稳定 CDN + 备用) ====== -->
     <script>
         // 检测 Three.js 是否加载成功
         window.threeLoaded = false;
         const errorDiv = document.getElementById('loading-error');
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" 
-            onload="window.threeLoaded = true; errorDiv.classList.remove('active');"
-            onerror="errorDiv.classList.add('active');">
+
+        function loadThree() {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+            script.onload = function() {
+                window.threeLoaded = true;
+                errorDiv.classList.remove('active');
+                initGame();
+            };
+            script.onerror = function() {
+                // 备用 CDN
+                const script2 = document.createElement('script');
+                script2.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';
+                script2.onload = function() {
+                    window.threeLoaded = true;
+                    errorDiv.classList.remove('active');
+                    initGame();
+                };
+                script2.onerror = function() {
+                    errorDiv.classList.add('active');
+                };
+                document.head.appendChild(script2);
+            };
+            document.head.appendChild(script);
+        }
+        loadThree();
     </script>
 
     <!-- ====== 游戏主脚本 ====== -->
     <script>
-        // 等待 DOM 和 Three.js 就绪
-        document.addEventListener('DOMContentLoaded', function() {
-            // 如果 Three.js 未加载，显示错误并停止
+        function initGame() {
+            // 如果 Three.js 未加载，停止
             if (typeof THREE === 'undefined') {
                 document.getElementById('loading-error').classList.add('active');
                 return;
@@ -536,8 +557,9 @@
                     z = (Math.random() - 0.5) * half * 2;
                     valid = true;
                     if (Math.abs(x) < 2.5 && Math.abs(z) < 2.5) valid = false;
+                    // 修复：直接使用 c.position 而不是 c.mesh.position
                     for (const c of collectibles) {
-                        if (c.mesh.position.distanceTo(new THREE.Vector3(x, 0, z)) < 1.2) {
+                        if (c.position.distanceTo(new THREE.Vector3(x, 0, z)) < 1.2) {
                             valid = false;
                             break;
                         }
@@ -616,8 +638,9 @@
                     z = (Math.random() - 0.5) * half * 2;
                     valid = true;
                     if (Math.abs(x) < 3 && Math.abs(z) < 3) valid = false;
+                    // 修复：直接使用 o.position 而不是 o.mesh.position
                     for (const o of obstacles) {
-                        if (o.mesh.position.distanceTo(new THREE.Vector3(x, 0, z)) < 2.0) {
+                        if (o.position.distanceTo(new THREE.Vector3(x, 0, z)) < 2.0) {
                             valid = false;
                             break;
                         }
@@ -1007,7 +1030,13 @@
             renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
             console.log('🎮 3D 收集大冒险已启动！');
-        });
+        }
+
+        // 如果 Three.js 已提前加载（例如通过 CDN），直接初始化
+        if (window.threeLoaded && typeof THREE !== 'undefined') {
+            document.getElementById('loading-error').classList.remove('active');
+            initGame();
+        }
     </script>
 </body>
 </html>
